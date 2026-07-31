@@ -5,29 +5,34 @@ workflows:
     instance_type: mac_mini_m1
     environment:
       java: 17
+      vars:
+        JAVA_HOME: $JAVA_HOME_17
     scripts:
-      - name: Configurar Projeto e Sincronizar Capacitor
+      - name: Preparar Estrutura do App (Offline)
         script: |
-          # 1. Cria a pasta da aplicação web exigida pelo Capacitor
+          # 1. Garante que a pasta 'www' com os arquivos estáticos exista
           mkdir -p www
           cp index.html www/
           cp pdf-lib.min.js www/
 
+      - name: Instalar Dependências Estáveis (Capacitor v6)
+        script: |
           # 2. Inicializa o projeto Node
           npm init -y
 
-          # 3. Instala os pacotes do Capacitor
-          npm install @capacitor/core @capacitor/cli @capacitor/android
+          # 3. Instala a versão estável e compatível do Capacitor (v6)
+          npm install @capacitor/core@^6.0.0 @capacitor/cli@^6.0.0 @capacitor/android@^6.0.0
 
-          # 4. Inicializa o Capacitor apontando para a pasta 'www'
+      - name: Sincronizar Plataforma Android
+        script: |
+          # 4. Configura e gera a estrutura nativa Android
           npx cap init "MescladorPDF" "com.empresa.mesclador" --web-dir "www"
           npx cap add android
-
-          # 5. Sincroniza os arquivos locais com a pasta nativa
           npx cap sync android
-          
+
       - name: Compilar APK (Debug)
         script: |
+          # 5. Dá permissão e compila o APK via Gradle usando Java 17
           cd android
           chmod +x gradlew
           ./gradlew assembleDebug
