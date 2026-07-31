@@ -65,7 +65,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  /// Remove bordas brancas automaticamente da imagem renderizada
+  /// Recorta margens brancas da imagem original
   Uint8List _removerBordasBrancas(Uint8List inputBytes) {
     final decoded = img.decodeImage(inputBytes);
     if (decoded == null) return inputBytes;
@@ -82,8 +82,7 @@ class _HomeScreenState extends State<HomeScreen> {
         final g = pixel.g;
         final b = pixel.b;
 
-        // Considera qualquer pixel que nao seja essencialmente branco
-        if (r < 240 || g < 240 || b < 240) {
+        if (r < 242 || g < 242 || b < 242) {
           if (x < minX) minX = x;
           if (x > maxX) maxX = x;
           if (y < minY) minY = y;
@@ -94,12 +93,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     if (minX >= maxX || minY >= maxY) return inputBytes;
 
-    // Margem de segurança de 8 pixels
-    minX = (minX - 8).clamp(0, decoded.width - 1);
-    minY = (minY - 8).clamp(0, decoded.height - 1);
-    maxX = (maxX + 8).clamp(0, decoded.width - 1);
-    maxY = (maxY + 8).clamp(0, decoded.height - 1);
-
+    // Recorte sem margem adicional para encostar nas bordas
     final cropped = img.copyCrop(
       decoded,
       x: minX,
@@ -142,45 +136,35 @@ class _HomeScreenState extends State<HomeScreen> {
       final etiquetaImage = await _carregarEProcessarImagem(_etiquetaFile!);
       final daceImage = await _carregarEProcessarImagem(_daceFile!);
 
-      // Tamanho padrão de etiqueta de envio (150mm x 100mm)
+      // Tamanho exato da etiqueta de envio (150mm x 100mm)
       const double widthPt = 150 * 2.83465;
       const double heightPt = 100 * 2.83465;
 
       pdf.addPage(
         pw.Page(
-          pageFormat: PdfPageFormat(widthPt, heightPt),
-          margin: pw.EdgeInsets.zero,
+          pageFormat: const PdfPageFormat(widthPt, heightPt),
+          margin: pw.EdgeInsets.zero, // ZERA TODAS AS MARGENS DA PÁGINA
           build: (pw.Context context) {
             return pw.Row(
+              cross: pw.CrossAxisAlignment.stretch,
               children: [
-                // Esquerda: Etiqueta
+                // Metade Esquerda: Etiqueta esticada preenchendo 100% da área
                 pw.Expanded(
-                  child: pw.Container(
-                    padding: const pw.EdgeInsets.all(2),
-                    child: pw.Center(
-                      child: pw.Image(
-                        etiquetaImage,
-                        fit: pw.BoxFit.contain,
-                      ),
-                    ),
+                  child: pw.Image(
+                    etiquetaImage,
+                    fit: pw.BoxFit.fill, // FORÇA PREENCHIMENTO COMPLETO
                   ),
                 ),
-                // Linha pontilhada de corte
+                // Linha de corte central fina
                 pw.Container(
                   width: 1,
-                  height: double.infinity,
                   color: PdfColors.grey400,
                 ),
-                // Direita: DACE (Declaração de Conteúdo)
+                // Metade Direita: DACE esticada preenchendo 100% da área
                 pw.Expanded(
-                  child: pw.Container(
-                    padding: const pw.EdgeInsets.all(2),
-                    child: pw.Center(
-                      child: pw.Image(
-                        daceImage,
-                        fit: pw.BoxFit.contain,
-                      ),
-                    ),
+                  child: pw.Image(
+                    daceImage,
+                    fit: pw.BoxFit.fill, // FORÇA PREENCHIMENTO COMPLETO
                   ),
                 ),
               ],
@@ -217,7 +201,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('WL Decant - Mesclador de Etiquetas'),
+        title: const Text('WL Decant - Mesclador'),
         backgroundColor: const Color(0xFF3B82C4),
       ),
       body: Padding(
@@ -240,7 +224,7 @@ class _HomeScreenState extends State<HomeScreen> {
               onPressed: _selecionarDace,
               icon: const Icon(Icons.receipt),
               label: Text(_daceFile == null
-                  ? '2. Selecionar DACE (Declaração)'
+                  ? '2. Selecionar DACE'
                   : 'DACE: ${_daceFile!.path.split('/').last}'),
               style: ElevatedButton.styleFrom(
                 minimumSize: const Size.fromHeight(50),
@@ -250,7 +234,7 @@ class _HomeScreenState extends State<HomeScreen> {
             TextField(
               controller: _pedidoController,
               decoration: const InputDecoration(
-                labelText: 'Número do Pedido (Opcional)',
+                labelText: 'Número do Pedido',
                 border: OutlineInputBorder(),
                 filled: true,
                 fillColor: Colors.white,
@@ -267,7 +251,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       minimumSize: const Size.fromHeight(55),
                     ),
                     child: const Text(
-                      'GERAR E GERAR PDF MESCLADO',
+                      'GERAR E IMPRIMIR PDF',
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
