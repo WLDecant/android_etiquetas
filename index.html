@@ -62,7 +62,7 @@
       const fileName = `Etiqueta Mesclada - Pedido ${numPedido}.pdf`;
 
       try {
-        setStatus("Cortando bordas brancas e processando...");
+        setStatus("Processando e isolando conteúdo útil...");
 
         const bytesEtiqueta = await fileEtiqueta.arrayBuffer();
         const bytesDace = await fileDace.arrayBuffer();
@@ -70,24 +70,27 @@
         const docEtiqueta = await PDFLib.PDFDocument.load(bytesEtiqueta);
         const docDace = await PDFLib.PDFDocument.load(bytesDace);
 
-        // CORTE REVOLUCIONÁRIO: Redefine a visibilidade da página original cortando o A4
-        // x: 0, y: 420 (corta os 420pt em branco do topo/base), largura: 283pt, altura: 422pt
-        const page1 = docEtiqueta.getPage(0);
-        page1.setCropBox(0, 420, 283, 422);
-        page1.setMediaBox(0, 420, 283, 422);
+        const pageEti = docEtiqueta.getPage(0);
+        const pageDace = docDace.getPage(0);
 
-        const page2 = docDace.getPage(0);
-        page2.setCropBox(0, 0, 283, 326);
-        page2.setMediaBox(0, 0, 283, 326);
+        // 1. RECORTE DA ETIQUETA
+        // No PDF, a origem (0,0) fica no CANTO INFERIOR ESQUERDO.
+        // A etiqueta útil fica na parte inferior/central do A4 (x: 0, y: 0, w: 283, h: 420 pt)
+        pageEti.setCropBox(0, 0, 283, 420);
+        pageEti.setMediaBox(0, 0, 283, 420);
 
-        // Cria o PDF final (150mm x 100mm = 425.04pt x 283.44pt)
+        // 2. RECORTE DA DACE
+        pageDace.setCropBox(0, 0, 283, 326);
+        pageDace.setMediaBox(0, 0, 283, 326);
+
+        // Cria a nova folha em formato paisagem (150mm x 100mm = 425.04pt x 283.44pt)
         const pdfFinal = await PDFLib.PDFDocument.create();
         const pageFinal = pdfFinal.addPage([425.04, 283.44]);
 
         const [embeddedEtiqueta] = await pdfFinal.embedPdf(docEtiqueta, [0]);
         const [embeddedDace] = await pdfFinal.embedPdf(docDace, [0]);
 
-        // Lado Esquerdo: Etiqueta (Preenche 100% da metade sem margem)
+        // Desenha a Etiqueta na metade esquerda ocupando toda a área
         pageFinal.drawPage(embeddedEtiqueta, {
           x: 0,
           y: 0,
@@ -95,7 +98,7 @@
           height: 283.44
         });
 
-        // Lado Direito: DACE
+        // Desenha a DACE na metade direita
         pageFinal.drawPage(embeddedDace, {
           x: 212.52,
           y: 0,
@@ -105,7 +108,7 @@
 
         const pdfBytes = await pdfFinal.save();
 
-        // Converte para Base64
+        // Converte em Base64
         let binary = '';
         const len = pdfBytes.byteLength;
         for (let i = 0; i < len; i++) {
@@ -113,31 +116,27 @@
         }
         const base64Data = window.btoa(binary);
 
-        // SALVAMENTO COM MENU DE ESCOLHA DO ANDROID
+        // SALVAMENTO/COMPARTILHAMENTO NATIVO
         if (window.Capacitor && window.Capacitor.Plugins) {
           const { Filesystem, Share } = window.Capacitor.Plugins;
 
-          // 1. Grava o arquivo temporariamente no cache para poder compartilhar/salvar
           const fileResult = await Filesystem.writeFile({
             path: fileName,
             data: base64Data,
             directory: 'CACHE'
           });
 
-          setStatus("Abrindo seletor de pasta do Android...", "blue");
-
-          // 2. Aciona o Seletor/Menu Nativo do Android (Escolher Pasta, Drive, Salvar em..., etc)
           if (Share) {
             await Share.share({
               title: fileName,
-              text: `Etiqueta Mesclada do Pedido ${numPedido}`,
+              text: `Etiqueta Mesclada - Pedido ${numPedido}`,
               url: fileResult.uri,
-              dialogTitle: 'Escolha onde salvar o PDF'
+              dialogTitle: 'Salvar ou Abrir PDF'
             });
-            setStatus(`✅ Processo concluído para o pedido ${numPedido}!`, 'green');
+            setStatus(`✅ Concluído! Pedido ${numPedido}`, 'green');
           }
         } else {
-          // Navegador Web
+          // Fallback para Navegador Web
           const blob = new Blob([pdfBytes], { type: 'application/pdf' });
           const link = document.createElement('a');
           link.href = URL.createObjectURL(blob);
