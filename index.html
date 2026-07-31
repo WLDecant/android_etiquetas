@@ -62,7 +62,7 @@
       const fileName = `Etiqueta Mesclada - Pedido ${numPedido}.pdf`;
 
       try {
-        setStatus("Processando e isolando conteúdo útil...");
+        setStatus("Processando, desvirando e recortando etiqueta...");
 
         const bytesEtiqueta = await fileEtiqueta.arrayBuffer();
         const bytesDace = await fileDace.arrayBuffer();
@@ -73,32 +73,32 @@
         const pageEti = docEtiqueta.getPage(0);
         const pageDace = docDace.getPage(0);
 
-        // 1. RECORTE DA ETIQUETA
-        // No PDF, a origem (0,0) fica no CANTO INFERIOR ESQUERDO.
-        // A etiqueta útil fica na parte inferior/central do A4 (x: 0, y: 0, w: 283, h: 420 pt)
-        pageEti.setCropBox(0, 0, 283, 420);
-        pageEti.setMediaBox(0, 0, 283, 420);
+        // 1. ISOLA A ETIQUETA NUVEIENVIO/LOGGI (Corta o aviso de topo e sobra de página)
+        // Coordenadas ajustadas para isolar apenas o quadro da Loggi/NuvemEnvio
+        pageEti.setCropBox(20, 200, 380, 580);
+        pageEti.setMediaBox(20, 200, 380, 580);
 
-        // 2. RECORTE DA DACE
+        // 2. ISOLA A DACE
         pageDace.setCropBox(0, 0, 283, 326);
         pageDace.setMediaBox(0, 0, 283, 326);
 
-        // Cria a nova folha em formato paisagem (150mm x 100mm = 425.04pt x 283.44pt)
+        // Cria a folha final paisagem (150mm x 100mm = 425.04pt x 283.44pt)
         const pdfFinal = await PDFLib.PDFDocument.create();
         const pageFinal = pdfFinal.addPage([425.04, 283.44]);
 
         const [embeddedEtiqueta] = await pdfFinal.embedPdf(docEtiqueta, [0]);
         const [embeddedDace] = await pdfFinal.embedPdf(docDace, [0]);
 
-        // Desenha a Etiqueta na metade esquerda ocupando toda a área
+        // DESENHA A ETIQUETA NA METADE ESQUERDA (Com rotação de -90° para ficar em pé)
         pageFinal.drawPage(embeddedEtiqueta, {
           x: 0,
-          y: 0,
-          width: 212.52,
-          height: 283.44
+          y: 283.44, // Ponto de ancoragem para rotação
+          width: 283.44,
+          height: 212.52,
+          rotate: PDFLib.degrees(-90) // Desvira a etiqueta
         });
 
-        // Desenha a DACE na metade direita
+        // DESENHA A DACE NA METADE DIREITA
         pageFinal.drawPage(embeddedDace, {
           x: 212.52,
           y: 0,
@@ -108,7 +108,7 @@
 
         const pdfBytes = await pdfFinal.save();
 
-        // Converte em Base64
+        // Converte para Base64
         let binary = '';
         const len = pdfBytes.byteLength;
         for (let i = 0; i < len; i++) {
@@ -116,7 +116,7 @@
         }
         const base64Data = window.btoa(binary);
 
-        // SALVAMENTO/COMPARTILHAMENTO NATIVO
+        // Salvamento/Compartilhamento
         if (window.Capacitor && window.Capacitor.Plugins) {
           const { Filesystem, Share } = window.Capacitor.Plugins;
 
@@ -133,10 +133,9 @@
               url: fileResult.uri,
               dialogTitle: 'Salvar ou Abrir PDF'
             });
-            setStatus(`✅ Concluído! Pedido ${numPedido}`, 'green');
+            setStatus(`✅ Sucesso! Pedido ${numPedido}`, 'green');
           }
         } else {
-          // Fallback para Navegador Web
           const blob = new Blob([pdfBytes], { type: 'application/pdf' });
           const link = document.createElement('a');
           link.href = URL.createObjectURL(blob);
