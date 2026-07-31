@@ -12,20 +12,18 @@ workflows:
         script: |
           flutter create --platforms=android --org com.wldecant .
 
-      - name: Atualizar compileSdk para 36
+      - name: Atualizar compileSdk
         script: |
-          sed -i '' 's/compileSdk = flutter.compileSdkVersion/compileSdk = 36/g' android/app/build.gradle.kts || true
-          sed -i '' 's/compileSdkVersion flutter.compileSdkVersion/compileSdkVersion 36/g' android/app/build.gradle || true
-          sed -i '' 's/targetSdk = flutter.targetSdkVersion/targetSdk = 36/g' android/app/build.gradle.kts || true
-          sed -i '' 's/targetSdkVersion flutter.targetSdkVersion/targetSdkVersion 36/g' android/app/build.gradle || true
+          sed -i '' 's/compileSdk = flutter.compileSdkVersion/compileSdk = 36/' android/app/build.gradle.kts || true
+          sed -i '' 's/targetSdk = flutter.targetSdkVersion/targetSdk = 36/' android/app/build.gradle.kts || true
+          sed -i '' 's/compileSdkVersion flutter.compileSdkVersion/compileSdkVersion 36/' android/app/build.gradle || true
+          sed -i '' 's/targetSdkVersion flutter.targetSdkVersion/targetSdkVersion 36/' android/app/build.gradle || true
 
-      - name: Obter dependências
-        script: |
-          flutter pub get
+      - name: Pub Get
+        script: flutter pub get
 
-      - name: Compilar APK
-        script: |
-          flutter build apk --release --no-tree-shake-icons
+      - name: Build
+        script: flutter build apk --release
 
     artifacts:
       - build/app/outputs/flutter-apk/*.apk
