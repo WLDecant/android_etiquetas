@@ -62,7 +62,7 @@
       const fileName = `Etiqueta Mesclada - Pedido ${numPedido}.pdf`;
 
       try {
-        setStatus("Processando topo do PDF...");
+        setStatus("Recortando topo A4 e gerando PDF...");
 
         const bytesEtiqueta = await fileEtiqueta.arrayBuffer();
         const bytesDace = await fileDace.arrayBuffer();
@@ -71,32 +71,29 @@
         const docDace = await PDFLib.PDFDocument.load(bytesDace);
 
         const pageEti = docEtiqueta.getPage(0);
-        const pageDace = docDace.getPage(0);
-
         const { width: a4W, height: a4H } = pageEti.getSize();
 
-        // RECORTE DA ETIQUETA (Substitui os Blocos 5-8 pelos Blocos 1-3 do TOPO)
-        // Começa em 48% da altura da página (y) e pega 52% de altura para cima (h)
-        const cropX = 0;
-        const cropY = a4H * 0.48; 
-        const cropWidth = a4W;
-        const cropHeight = a4H * 0.52;
-
-        pageEti.setCropBox(cropX, cropY, cropWidth, cropHeight);
-        pageEti.setMediaBox(cropX, cropY, cropWidth, cropHeight);
-
-        // RECORTE DA DACE
-        pageDace.setCropBox(0, 0, 283.46, 425.20);
-        pageDace.setMediaBox(0, 0, 283.46, 425.20);
-
-        // Criar folha final (150mm x 100mm = 425.04pt x 283.44pt)
+        // Criar documento final (150mm x 100mm = 425.04pt x 283.44pt)
         const pdfFinal = await PDFLib.PDFDocument.create();
         const pageFinal = pdfFinal.addPage([425.04, 283.44]);
 
-        const [embeddedEtiqueta] = await pdfFinal.embedPdf(docEtiqueta, [0]);
-        const [embeddedDace] = await pdfFinal.embedPdf(docDace, [0]);
+        // RECORTE DIRETO NO EMBED (Força o corte exato dos Blocos 1, 2 e 3 do topo A4)
+        // BoundingBox: { left, bottom, right, top }
+        const [embeddedEtiqueta] = await pdfFinal.embedPdf(docEtiqueta, [{
+          left: 0,
+          bottom: a4H * 0.45, // Corta a metade inferior
+          right: a4W,
+          top: a4H            // Mantém até o topo da página A4
+        }]);
 
-        // 1. DESENHA A ETIQUETA RECOR TADA NO LADO ESQUERDO
+        const [embeddedDace] = await pdfFinal.embedPdf(docDace, [{
+          left: 0,
+          bottom: 0,
+          right: 283.46,
+          top: 425.20
+        }]);
+
+        // 1. DESENHA A ETIQUETA (TOPO) NA METADE ESQUERDA
         pageFinal.drawPage(embeddedEtiqueta, {
           x: 0,
           y: 0,
@@ -104,7 +101,7 @@
           height: 283.44
         });
 
-        // 2. DESENHA A DACE NO LADO DIREITO
+        // 2. DESENHA A DACE NA METADE DIREITA
         pageFinal.drawPage(embeddedDace, {
           x: 212.52,
           y: 0,
