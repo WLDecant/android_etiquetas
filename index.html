@@ -62,7 +62,7 @@
       const fileName = `Etiqueta Mesclada - Pedido ${numPedido}.pdf`;
 
       try {
-        setStatus("Ajustando recorte da etiqueta...");
+        setStatus("Isolando o topo A4 e mesclando...");
 
         const bytesEtiqueta = await fileEtiqueta.arrayBuffer();
         const bytesDace = await fileDace.arrayBuffer();
@@ -73,32 +73,31 @@
         const pageEti = docEtiqueta.getPage(0);
         const pageDace = docDace.getPage(0);
 
-        // Obter dimensões reais da página de origem
-        const { width: origW, height: origH } = pageEti.getSize();
+        // Obter dimensões reais da folha A4 (Tipicamente ~595.28 x 841.89 pt)
+        const { width: a4W, height: a4H } = pageEti.getSize();
 
-        // 1. CORTE DA ETIQUETA (x, y, largura, altura)
-        // No PDF-Lib, o ponto (0,0) é o CANTO INFERIOR ESQUERDO.
-        // Como o bloco da etiqueta fica na parte SUPERIOR do A4, definimos o Y a partir de baixo:
-        const cropX = 10;                     // Leve margem na esquerda
-        const cropY = origH * 0.35;           // Descarta os 35% inferiores (sobra em branco)
-        const cropW = origW * 0.95;           // Pega quase a largura inteira da folha
-        const cropH = origH * 0.58;           // Pega o bloco da etiqueta descartando apenas o topo extremo
+        // 1. RECORTE DA ETIQUETA (Apenas os primeiros 100x150mm no TOPO da página)
+        // Convertendo mm para pontos do PDF (1 mm = 2.83465 pt)
+        const cropWidth = 283.46;  // ~100mm
+        const cropHeight = 425.20; // ~150mm
+        const cropX = 0;
+        const cropY = a4H - cropHeight; // Pega exatamente o bloco superior descartando o resto branco
 
-        pageEti.setCropBox(cropX, cropY, cropW, cropH);
-        pageEti.setMediaBox(cropX, cropY, cropW, cropH);
+        pageEti.setCropBox(cropX, cropY, cropWidth, cropHeight);
+        pageEti.setMediaBox(cropX, cropY, cropWidth, cropHeight);
 
-        // 2. CORTE DA DACE (Lado direito)
-        pageDace.setCropBox(0, 0, 283, 326);
-        pageDace.setMediaBox(0, 0, 283, 326);
+        // 2. RECORTE DA DACE (Recorte limpo)
+        pageDace.setCropBox(0, 0, 283.46, 425.20);
+        pageDace.setMediaBox(0, 0, 283.46, 425.20);
 
-        // Criar folha final (150mm x 100mm = 425.04pt x 283.44pt)
+        // Folha final mesclada de 150mm x 100mm (425.04pt x 283.44pt)
         const pdfFinal = await PDFLib.PDFDocument.create();
         const pageFinal = pdfFinal.addPage([425.04, 283.44]);
 
         const [embeddedEtiqueta] = await pdfFinal.embedPdf(docEtiqueta, [0]);
         const [embeddedDace] = await pdfFinal.embedPdf(docDace, [0]);
 
-        // 3. DESENHA A ETIQUETA RECORTADA NA METADE ESQUERDA
+        // 3. DESENHA A ETIQUETA DO TOPO NA METADE ESQUERDA
         pageFinal.drawPage(embeddedEtiqueta, {
           x: 0,
           y: 0,
