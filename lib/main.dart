@@ -104,25 +104,31 @@ class _HomeScreenState extends State<HomeScreen> {
           margin: pw.EdgeInsets.zero,
           build: (pw.Context context) {
             return pw.Row(
-              cross: pw.CrossAxisAlignment.stretch,
               children: [
-                // Etiqueta preenchendo o lado esquerdo
+                // Etiqueta (Esquerda)
                 pw.Expanded(
-                  child: pw.Image(
-                    etiquetaImage,
-                    fit: pw.BoxFit.fill,
+                  child: pw.Container(
+                    height: heightPt,
+                    child: pw.Image(
+                      etiquetaImage,
+                      fit: pw.BoxFit.fill,
+                    ),
                   ),
                 ),
-                // Divisória discreta
+                // Linha de corte central
                 pw.Container(
                   width: 1,
+                  height: heightPt,
                   color: PdfColors.grey400,
                 ),
-                // DACE preenchendo o lado direito
+                // DACE (Direita)
                 pw.Expanded(
-                  child: pw.Image(
-                    daceImage,
-                    fit: pw.BoxFit.fill,
+                  child: pw.Container(
+                    height: heightPt,
+                    child: pw.Image(
+                      daceImage,
+                      fit: pw.BoxFit.fill,
+                    ),
                   ),
                 ),
               ],
