@@ -6,20 +6,25 @@ workflows:
     environment:
       java: 17
     scripts:
-      - name: Instalar dependências e CLI do Capacitor
+      - name: Configurar Projeto e Sincronizar Capacitor
         script: |
+          # 1. Cria o package.json se não existir
           npm init -y
+
+          # 2. Instala os pacotes do Capacitor
           npm install @capacitor/core @capacitor/cli @capacitor/android
-          
-      - name: Inicializar Capacitor e Plataforma Android
-        script: |
+
+          # 3. Inicializa e cria a pasta do Android
           npx cap init "MescladorPDF" "com.empresa.mesclador" --web-dir "."
           npx cap add android
-          npx cap copy android
+
+          # 4. Sincroniza os arquivos e gera os scripts internos (capacitor.settings.gradle)
+          npx cap sync android
           
       - name: Compilar APK (Debug)
         script: |
           cd android
+          chmod +x gradlew
           ./gradlew assembleDebug
 
     artifacts:
