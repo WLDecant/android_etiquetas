@@ -1,3 +1,11 @@
+name: app_wl_decant
+description: App para mesclar etiquetas e DACE WL Decant
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
 dependencies:
   flutter:
     sdk: flutter
@@ -5,3 +13,12 @@ dependencies:
   pdf: ^3.10.8
   printing: ^5.13.0
   path_provider: ^2.1.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/icone_wl.png
