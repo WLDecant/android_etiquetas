@@ -1,0 +1,21 @@
+workflows:
+  android-build:
+    name: Compilar APK Android
+    max_build_duration: 30
+    instance_type: mac_mini_m1
+    environment:
+      flutter: stable
+    scripts:
+      - name: Obter dependências do Flutter
+        script: |
+          flutter packages pub get
+      - name: Compilar APK
+        script: |
+          flutter build apk --release
+    artifacts:
+      - build/app/outputs/flutter-apk/*.apk
+    publishing:
+      email:
+        recipients:
+          - wldecant@gmail.com
+        notify_on_build_failure: false
