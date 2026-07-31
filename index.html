@@ -13,8 +13,8 @@
     input[type="file"] { display: block; width: 100%; padding: 8px; background: #f0f0f0; border-radius: 6px; border: 1px solid #ccc; }
     button { width: 100%; margin-top: 25px; padding: 14px; background: #007bff; color: white; border: none; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; }
     button:active { background: #0056b3; }
+    #status { margin-top: 15px; text-align: center; font-weight: bold; font-size: 14px; color: #333; word-break: break-all; }
   </style>
-  <!-- Baixe o arquivo pdf-lib.min.js para a mesma pasta para rodar offline -->
   <script src="pdf-lib.min.js"></script>
 </head>
 <body>
@@ -29,9 +29,17 @@
     <input type="file" id="pdfDace" accept="application/pdf" />
 
     <button onclick="mesclarPDFs()">Gerar e Salvar PDF</button>
+
+    <div id="status"></div>
   </div>
 
   <script>
+    function setStatus(msg, color = '#333') {
+      const el = document.getElementById('status');
+      el.style.color = color;
+      el.innerText = msg;
+    }
+
     async function mesclarPDFs() {
       const fileEtiqueta = document.getElementById('pdfEtiqueta').files[0];
       const fileDace = document.getElementById('pdfDace').files[0];
@@ -42,44 +50,74 @@
       }
 
       try {
+        setStatus("Processando os arquivos PDF...");
+
         const bytesEtiqueta = await fileEtiqueta.arrayBuffer();
         const bytesDace = await fileDace.arrayBuffer();
 
         const docEtiqueta = await PDFLib.PDFDocument.load(bytesEtiqueta);
         const docDace = await PDFLib.PDFDocument.load(bytesDace);
 
-        // Cria o PDF no tamanho padrão da etiqueta térmica (100mm x 150mm ≈ 283 x 425 pt)
+        // Cria o PDF no formato das etiquetas mescladas (150mm x 100mm = 425.04pt x 283.44pt)
         const pdfFinal = await PDFLib.PDFDocument.create();
-        const page = pdfFinal.addPage([425, 283]); // Orientação paisagem
+        const page = pdfFinal.addPage([425.04, 283.44]);
 
         const [embeddedEtiqueta] = await pdfFinal.embedPdf(docEtiqueta, [0]);
         const [embeddedDace] = await pdfFinal.embedPdf(docDace, [0]);
 
-        // Redimensiona e recorta as margens para encaixar lado a lado
+        // Lado Esquerdo: Etiqueta (212.52 x 283.44)
         page.drawPage(embeddedEtiqueta, {
           x: 0,
           y: 0,
-          width: 212,
-          height: 283
+          width: 212.52,
+          height: 283.44
         });
 
+        // Lado Direito: DACE Resumida (212.52 x 283.44)
         page.drawPage(embeddedDace, {
-          x: 212,
+          x: 212.52,
           y: 0,
-          width: 212,
-          height: 283
+          width: 212.52,
+          height: 283.44
         });
 
         const pdfBytes = await pdfFinal.save();
         
-        // Download direto do arquivo via Blob (funciona offline na WebView)
-        const blob = new Blob([pdfBytes], { type: 'application/pdf' });
-        const link = document.createElement('a');
-        link.href = URL.createObjectURL(blob);
-        link.download = `Etiqueta_Mesclada_${Date.now()}.pdf`;
-        link.click();
+        // Converte os bytes do PDF para Base64
+        let binary = '';
+        const len = pdfBytes.byteLength;
+        for (let i = 0; i < len; i++) {
+          binary += String.fromCharCode(pdfBytes[i]);
+        }
+        const base64Data = window.btoa(binary);
+
+        const fileName = `Etiqueta_Mesclada_${Date.now()}.pdf`;
+
+        // Verifica se o plugin nativo do Capacitor Filesystem está presente no APK
+        if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Filesystem) {
+          const Filesystem = window.Capacitor.Plugins.Filesystem;
+
+          await Filesystem.writeFile({
+            path: fileName,
+            data: base64Data,
+            directory: 'DOCUMENTS', // Salva na pasta Documentos do Android
+            recursive: true
+          });
+
+          setStatus(`✅ Salvo com sucesso na pasta Documentos como:\n${fileName}`, 'green');
+        } else {
+          // Fallback Web para testes em navegadores
+          const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+          const link = document.createElement('a');
+          link.href = URL.createObjectURL(blob);
+          link.download = fileName;
+          link.click();
+          setStatus("✅ PDF gerado via Navegador!", 'green');
+        }
       } catch (err) {
-        alert("Erro ao processar PDFs: " + err.message);
+        console.error(err);
+        setStatus("❌ Erro: " + err.message, 'red');
+        alert("Erro ao processar: " + err.message);
       }
     }
   </script>
