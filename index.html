@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mesclador PDF Offline</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 20px; background: #f5f5f5; margin: 0; }
+    .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); max-width: 400px; margin: 0 auto; }
+    h2 { text-align: center; color: #333; margin-top: 0; }
+    label { font-weight: bold; display: block; margin-top: 15px; margin-bottom: 5px; color: #555; }
+    input[type="file"] { display: block; width: 100%; padding: 8px; background: #f0f0f0; border-radius: 6px; border: 1px solid #ccc; }
+    button { width: 100%; margin-top: 25px; padding: 14px; background: #007bff; color: white; border: none; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; }
+    button:active { background: #0056b3; }
+  </style>
+  <!-- Baixe o arquivo pdf-lib.min.js para a mesma pasta para rodar offline -->
+  <script src="pdf-lib.min.js"></script>
+</head>
+<body>
+
+  <div class="card">
+    <h2>Mesclador de Etiquetas</h2>
+
+    <label>1. Selecione a Etiqueta (PDF)</label>
+    <input type="file" id="pdfEtiqueta" accept="application/pdf" />
+
+    <label>2. Selecione a DACE (PDF)</label>
+    <input type="file" id="pdfDace" accept="application/pdf" />
+
+    <button onclick="mesclarPDFs()">Gerar e Salvar PDF</button>
+  </div>
+
+  <script>
+    async function mesclarPDFs() {
+      const fileEtiqueta = document.getElementById('pdfEtiqueta').files[0];
+      const fileDace = document.getElementById('pdfDace').files[0];
+
+      if (!fileEtiqueta || !fileDace) {
+        alert("Por favor, selecione ambos os arquivos PDF.");
+        return;
+      }
+
+      try {
+        const bytesEtiqueta = await fileEtiqueta.arrayBuffer();
+        const bytesDace = await fileDace.arrayBuffer();
+
+        const docEtiqueta = await PDFLib.PDFDocument.load(bytesEtiqueta);
+        const docDace = await PDFLib.PDFDocument.load(bytesDace);
+
+        // Cria o PDF no tamanho padrão da etiqueta térmica (100mm x 150mm ≈ 283 x 425 pt)
+        const pdfFinal = await PDFLib.PDFDocument.create();
+        const page = pdfFinal.addPage([425, 283]); // Orientação paisagem
+
+        const [embeddedEtiqueta] = await pdfFinal.embedPdf(docEtiqueta, [0]);
+        const [embeddedDace] = await pdfFinal.embedPdf(docDace, [0]);
+
+        // Redimensiona e recorta as margens para encaixar lado a lado
+        page.drawPage(embeddedEtiqueta, {
+          x: 0,
+          y: 0,
+          width: 212,
+          height: 283
+        });
+
+        page.drawPage(embeddedDace, {
+          x: 212,
+          y: 0,
+          width: 212,
+          height: 283
+        });
+
+        const pdfBytes = await pdfFinal.save();
+        
+        // Download direto do arquivo via Blob (funciona offline na WebView)
+        const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `Etiqueta_Mesclada_${Date.now()}.pdf`;
+        link.click();
+      } catch (err) {
+        alert("Erro ao processar PDFs: " + err.message);
+      }
+    }
+  </script>
+</body>
+</html>
