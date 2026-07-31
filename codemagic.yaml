@@ -6,7 +6,7 @@ workflows:
     environment:
       flutter: stable
     scripts:
-      - name: Obter dependências do Flutter
+      - name: Obter dependencias do Flutter
         script: |
           flutter packages pub get
       - name: Compilar APK
@@ -18,4 +18,3 @@ workflows:
       email:
         recipients:
           - wldecant@gmail.com
-        notify_on_build_failure: false
