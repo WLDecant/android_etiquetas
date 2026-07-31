@@ -3,20 +3,33 @@ workflows:
     name: Compilar APK Android
     max_build_duration: 30
     instance_type: mac_mini_m1
+
     environment:
       flutter: stable
+
     scripts:
       - name: Criar projeto Android
         script: |
           flutter create --platforms=android --org com.wldecant .
-      - name: Obter dependencias
+
+      - name: Atualizar compileSdk para 36
         script: |
-          flutter packages pub get
+          sed -i '' 's/compileSdk = flutter.compileSdkVersion/compileSdk = 36/g' android/app/build.gradle.kts || true
+          sed -i '' 's/compileSdkVersion flutter.compileSdkVersion/compileSdkVersion 36/g' android/app/build.gradle || true
+          sed -i '' 's/targetSdk = flutter.targetSdkVersion/targetSdk = 36/g' android/app/build.gradle.kts || true
+          sed -i '' 's/targetSdkVersion flutter.targetSdkVersion/targetSdkVersion 36/g' android/app/build.gradle || true
+
+      - name: Obter dependências
+        script: |
+          flutter pub get
+
       - name: Compilar APK
         script: |
           flutter build apk --release --no-tree-shake-icons
+
     artifacts:
       - build/app/outputs/flutter-apk/*.apk
+
     publishing:
       email:
         recipients:
