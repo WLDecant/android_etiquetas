@@ -70,15 +70,14 @@
         const docEtiqueta = await PDFLib.PDFDocument.load(bytesEtiqueta);
         const docDace = await PDFLib.PDFDocument.load(bytesDace);
 
-        // Cria a folha mesclada final (Orientação paisagem: 150mm x 100mm = 425.04pt x 283.44pt)
+        // Define folha mesclada (150mm x 100mm = 425.04pt x 283.44pt)
         const pdfFinal = await PDFLib.PDFDocument.create();
         const pageFinal = pdfFinal.addPage([425.04, 283.44]);
 
         const [embeddedEtiqueta] = await pdfFinal.embedPdf(docEtiqueta, [0]);
         const [embeddedDace] = await pdfFinal.embedPdf(docDace, [0]);
 
-        // 1. DESENHA A ETIQUETA (Lado Esquerdo)
-        // Extrai SOMENTE a região útil da etiqueta A4 (x: 10, y: 410, w: 270, h: 410) sem as áreas brancas em volta
+        // Recorta a etiqueta (remove bordas A4) e desenha na esquerda
         pageFinal.drawPage(embeddedEtiqueta, {
           x: 0,
           y: 0,
@@ -86,12 +85,10 @@
           height: 283.44,
           xScale: 1,
           yScale: 1,
-          // Recorta a caixa exata do conteúdo da Etiqueta
-          boundingClientRect: { x: 10, y: 410, width: 270, height: 410 }
+          boundingClientRect: { x: 15, y: 415, width: 265, height: 410 }
         });
 
-        // 2. DESENHA A DACE RESUMIDA (Lado Direito)
-        // Extrai a área exata da DACE eliminando margens
+        // Recorta a DACE e desenha na direita
         pageFinal.drawPage(embeddedDace, {
           x: 212.52,
           y: 0,
@@ -104,28 +101,47 @@
 
         const pdfBytes = await pdfFinal.save();
 
-        // CONVERTE E DISPARA DOWNLOAD COM ESCOLHA DE PASTA / COMPARTILHAMENTO
-        const blob = new Blob([pdfBytes], { type: 'application/pdf' });
-        const file = new File([blob], fileName, { type: 'application/pdf' });
+        // Converte para Base64
+        let binary = '';
+        const len = pdfBytes.byteLength;
+        for (let i = 0; i < len; i++) {
+          binary += String.fromCharCode(pdfBytes[i]);
+        }
+        const base64Data = window.btoa(binary);
 
-        // Tenta acionar a API de compartilhamento/salvamento do Android (permite escolher onde salvar ou abrir)
-        if (navigator.canShare && navigator.canShare({ files: [file] })) {
-          await navigator.share({
-            files: [file],
-            title: fileName,
-            text: `Etiqueta do Pedido ${numPedido}`
+        // Gravando via Capacitor Filesystem
+        if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Filesystem) {
+          const { Filesystem, FileOpener } = window.Capacitor.Plugins;
+
+          // Salva na pasta pública 'Documents' do armazenamento interno
+          const saveResult = await Filesystem.writeFile({
+            path: fileName,
+            data: base64Data,
+            directory: 'DOCUMENTS',
+            recursive: true
           });
-          setStatus(`✅ Arquivo pronto! Escolha onde salvar ou abrir.`, 'green');
+
+          setStatus(`✅ Salvo na pasta Documentos!\nArquivo: ${fileName}`, 'green');
+
+          // Tenta abrir o PDF automaticamente no leitor padrão do Android
+          if (FileOpener) {
+            try {
+              await FileOpener.open({
+                filePath: saveResult.uri,
+                contentType: 'application/pdf'
+              });
+            } catch (e) {
+              console.log("Não foi possível abrir o leitor nativo automaticamente.", e);
+            }
+          }
         } else {
-          // Caso a WebShare API não esteja disponível, força o seletor tradicional
+          // Fallback para navegador
+          const blob = new Blob([pdfBytes], { type: 'application/pdf' });
           const link = document.createElement('a');
-          const url = URL.createObjectURL(blob);
-          link.href = url;
+          link.href = URL.createObjectURL(blob);
           link.download = fileName;
-          document.body.appendChild(link);
           link.click();
-          document.body.removeChild(link);
-          setStatus(`✅ Baixado como: ${fileName}`, 'green');
+          setStatus(`✅ Gerado e baixado: ${fileName}`, 'green');
         }
       } catch (err) {
         console.error(err);
