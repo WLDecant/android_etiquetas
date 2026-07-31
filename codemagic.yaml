@@ -5,31 +5,16 @@ workflows:
     instance_type: mac_mini_m1
     environment:
       flutter: stable
+      android_gradle_plugin: 8.2.1
     scripts:
-      - name: Criar arquivos nativos do Android com SDK 36
+      - name: Criar projeto Android
         script: |
           flutter create --platforms=android --org com.wldecant .
-          python3 -c "
-import os, re
-path = 'android/app/build.gradle'
-if os.path.exists(path):
-    with open(path, 'r') as f:
-        content = f.read()
-    content = re.sub(r'compileSdkVersion\s+.*', 'compileSdkVersion 36', content)
-    content = re.sub(r'targetSdkVersion\s+.*', 'targetSdkVersion 36', content)
-    with open(path, 'w') as f:
-        f.write(content)
-
-path_kts = 'android/app/build.gradle.kts'
-if os.path.exists(path_kts):
-    with open(path_kts, 'r') as f:
-        content = f.read()
-    content = re.sub(r'compileSdk\s*=.*', 'compileSdk = 36', content)
-    content = re.sub(r'targetSdk\s*=.*', 'targetSdk = 36', content)
-    with open(path_kts, 'w') as f:
-        f.write(content)
-"
-      - name: Obter dependencias do Flutter
+      - name: Configurar SDK 36 no Gradle
+        script: |
+          printf "\nandroid.suppressUnsupportedCompileSdk=36\n" >> android/gradle.properties
+          printf "flutter.compileSdkVersion=36\n" >> android/local.properties
+      - name: Obter dependencias
         script: |
           flutter packages pub get
       - name: Compilar APK
