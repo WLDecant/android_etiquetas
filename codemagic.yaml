@@ -9,20 +9,6 @@ workflows:
       - name: Criar projeto Android
         script: |
           flutter create --platforms=android --org com.wldecant .
-      - name: Forçar compileSdk 36 nos subprojetos
-        script: |
-          cat << 'EOF' > fix_sdk.gradle.kts
-          subprojects {
-              afterEvaluate {
-                  if (plugins.hasPlugin("com.android.application") || plugins.hasPlugin("com.android.library")) {
-                      configure<com.android.build.gradle.BaseExtension> {
-                          compileSdkVersion(36)
-                      }
-                  }
-              }
-          }
-          EOF
-          echo "apply(from = \"../fix_sdk.gradle.kts\")" >> android/app/build.gradle.kts
       - name: Obter dependencias
         script: |
           flutter packages pub get
