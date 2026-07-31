@@ -10,7 +10,8 @@
     .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); max-width: 400px; margin: 0 auto; }
     h2 { text-align: center; color: #333; margin-top: 0; }
     label { font-weight: bold; display: block; margin-top: 15px; margin-bottom: 5px; color: #555; }
-    input[type="file"] { display: block; width: 100%; padding: 8px; background: #f0f0f0; border-radius: 6px; border: 1px solid #ccc; }
+    input[type="file"], input[type="text"] { display: block; width: 100%; padding: 10px; background: #f9f9f9; border-radius: 6px; border: 1px solid #ccc; font-size: 14px; }
+    input[type="text"] { background: #fff; }
     button { width: 100%; margin-top: 25px; padding: 14px; background: #007bff; color: white; border: none; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; }
     button:active { background: #0056b3; }
     #status { margin-top: 15px; text-align: center; font-weight: bold; font-size: 14px; color: #333; word-break: break-all; }
@@ -22,13 +23,16 @@
   <div class="card">
     <h2>Mesclador de Etiquetas</h2>
 
-    <label>1. Selecione a Etiqueta (PDF)</label>
+    <label for="numPedido">Número do Pedido</label>
+    <input type="text" id="numPedido" placeholder="Ex: 100 ou 123456" />
+
+    <label for="pdfEtiqueta">1. Selecione a Etiqueta (PDF)</label>
     <input type="file" id="pdfEtiqueta" accept="application/pdf" />
 
-    <label>2. Selecione a DACE (PDF)</label>
+    <label for="pdfDace">2. Selecione a DACE (PDF)</label>
     <input type="file" id="pdfDace" accept="application/pdf" />
 
-    <button onclick="mesclarPDFs()">Gerar e Salvar PDF</button>
+    <button onclick="mesclarPDFs()">Gerar, Salvar e Abrir PDF</button>
 
     <div id="status"></div>
   </div>
@@ -41,16 +45,24 @@
     }
 
     async function mesclarPDFs() {
+      const numPedido = document.getElementById('numPedido').value.trim();
       const fileEtiqueta = document.getElementById('pdfEtiqueta').files[0];
       const fileDace = document.getElementById('pdfDace').files[0];
+
+      if (!numPedido) {
+        alert("Por favor, informe o número do pedido.");
+        return;
+      }
 
       if (!fileEtiqueta || !fileDace) {
         alert("Por favor, selecione ambos os arquivos PDF.");
         return;
       }
 
+      const fileName = `Etiqueta Mesclada - Pedido ${numPedido}.pdf`;
+
       try {
-        setStatus("Processando os arquivos PDF...");
+        setStatus("Processando e recortando PDFs...");
 
         const bytesEtiqueta = await fileEtiqueta.arrayBuffer();
         const bytesDace = await fileDace.arrayBuffer();
@@ -58,23 +70,31 @@
         const docEtiqueta = await PDFLib.PDFDocument.load(bytesEtiqueta);
         const docDace = await PDFLib.PDFDocument.load(bytesDace);
 
-        // Cria o PDF no formato das etiquetas mescladas (150mm x 100mm = 425.04pt x 283.44pt)
+        // Recorta as bordas brancas da Etiqueta
+        const pageEti = docEtiqueta.getPage(0);
+        pageEti.setCropBox(0, 420, 283, 422);
+
+        // Recorta a DACE
+        const pageDace = docDace.getPage(0);
+        pageDace.setCropBox(0, 0, 283, 326);
+
+        // Cria o PDF mesclado no tamanho da etiqueta térmica (150mm x 100mm = 425.04pt x 283.44pt)
         const pdfFinal = await PDFLib.PDFDocument.create();
-        const page = pdfFinal.addPage([425.04, 283.44]);
+        const pageFinal = pdfFinal.addPage([425.04, 283.44]);
 
         const [embeddedEtiqueta] = await pdfFinal.embedPdf(docEtiqueta, [0]);
         const [embeddedDace] = await pdfFinal.embedPdf(docDace, [0]);
 
-        // Lado Esquerdo: Etiqueta (212.52 x 283.44)
-        page.drawPage(embeddedEtiqueta, {
+        // Lado Esquerdo: Etiqueta
+        pageFinal.drawPage(embeddedEtiqueta, {
           x: 0,
           y: 0,
           width: 212.52,
           height: 283.44
         });
 
-        // Lado Direito: DACE Resumida (212.52 x 283.44)
-        page.drawPage(embeddedDace, {
+        // Lado Direito: DACE
+        pageFinal.drawPage(embeddedDace, {
           x: 212.52,
           y: 0,
           width: 212.52,
@@ -82,8 +102,8 @@
         });
 
         const pdfBytes = await pdfFinal.save();
-        
-        // Converte os bytes do PDF para Base64
+
+        // Converte os bytes para Base64
         let binary = '';
         const len = pdfBytes.byteLength;
         for (let i = 0; i < len; i++) {
@@ -91,28 +111,39 @@
         }
         const base64Data = window.btoa(binary);
 
-        const fileName = `Etiqueta_Mesclada_${Date.now()}.pdf`;
+        // Se estiver rodando dentro do APK (Capacitor)
+        if (window.Capacitor && window.Capacitor.Plugins) {
+          const { Filesystem, FileOpener } = window.Capacitor.Plugins;
 
-        // Verifica se o plugin nativo do Capacitor Filesystem está presente no APK
-        if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Filesystem) {
-          const Filesystem = window.Capacitor.Plugins.Filesystem;
-
-          await Filesystem.writeFile({
+          // 1. Salva o arquivo na pasta de Documentos/Downloads do dispositivo
+          const result = await Filesystem.writeFile({
             path: fileName,
             data: base64Data,
-            directory: 'DOCUMENTS', // Salva na pasta Documentos do Android
+            directory: 'DOCUMENTS',
             recursive: true
           });
 
-          setStatus(`✅ Salvo com sucesso na pasta Documentos como:\n${fileName}`, 'green');
+          setStatus(`✅ PDF Gerado: ${fileName}\nAbrindo arquivo...`, 'green');
+
+          // 2. Abre o PDF automaticamente com o leitor padrão do celular
+          if (FileOpener) {
+            await FileOpener.open({
+              filePath: result.uri,
+              contentType: 'application/pdf'
+            });
+          }
         } else {
-          // Fallback Web para testes em navegadores
+          // Fallback para navegador no computador
           const blob = new Blob([pdfBytes], { type: 'application/pdf' });
           const link = document.createElement('a');
-          link.href = URL.createObjectURL(blob);
+          const url = URL.createObjectURL(blob);
+          link.href = url;
           link.download = fileName;
           link.click();
-          setStatus("✅ PDF gerado via Navegador!", 'green');
+
+          // Tenta abrir numa nova aba
+          window.open(url, '_blank');
+          setStatus(`✅ Gerado e baixado: ${fileName}`, 'green');
         }
       } catch (err) {
         console.error(err);
