@@ -65,44 +65,47 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  /// Recorta margens brancas da imagem original
+  /// Recorta bordas brancas usando amostragem compativel
   Uint8List _removerBordasBrancas(Uint8List inputBytes) {
-    final decoded = img.decodeImage(inputBytes);
-    if (decoded == null) return inputBytes;
+    try {
+      final decoded = img.decodeImage(inputBytes);
+      if (decoded == null) return inputBytes;
 
-    int minX = decoded.width;
-    int minY = decoded.height;
-    int maxX = 0;
-    int maxY = 0;
+      int minX = decoded.width;
+      int minY = decoded.height;
+      int maxX = 0;
+      int maxY = 0;
 
-    for (int y = 0; y < decoded.height; y++) {
-      for (int x = 0; x < decoded.width; x++) {
-        final pixel = decoded.getPixel(x, y);
-        final r = pixel.r;
-        final g = pixel.g;
-        final b = pixel.b;
+      for (int y = 0; y < decoded.height; y += 2) {
+        for (int x = 0; x < decoded.width; x += 2) {
+          final pixel = decoded.getPixel(x, y);
+          final r = pixel.r;
+          final g = pixel.g;
+          final b = pixel.b;
 
-        if (r < 242 || g < 242 || b < 242) {
-          if (x < minX) minX = x;
-          if (x > maxX) maxX = x;
-          if (y < minY) minY = y;
-          if (y > maxY) maxY = y;
+          if (r < 240 || g < 240 || b < 240) {
+            if (x < minX) minX = x;
+            if (x > maxX) maxX = x;
+            if (y < minY) minY = y;
+            if (y > maxY) maxY = y;
+          }
         }
       }
+
+      if (minX >= maxX || minY >= maxY) return inputBytes;
+
+      final cropped = img.copyCrop(
+        decoded,
+        x: minX,
+        y: minY,
+        width: maxX - minX,
+        height: maxY - minY,
+      );
+
+      return Uint8List.fromList(img.encodePng(cropped));
+    } catch (_) {
+      return inputBytes;
     }
-
-    if (minX >= maxX || minY >= maxY) return inputBytes;
-
-    // Recorte sem margem adicional para encostar nas bordas
-    final cropped = img.copyCrop(
-      decoded,
-      x: minX,
-      y: minY,
-      width: maxX - minX,
-      height: maxY - minY,
-    );
-
-    return Uint8List.fromList(img.encodePng(cropped));
   }
 
   Future<pw.ImageProvider> _carregarEProcessarImagem(File file) async {
@@ -136,35 +139,32 @@ class _HomeScreenState extends State<HomeScreen> {
       final etiquetaImage = await _carregarEProcessarImagem(_etiquetaFile!);
       final daceImage = await _carregarEProcessarImagem(_daceFile!);
 
-      // Tamanho exato da etiqueta de envio (150mm x 100mm)
+      // Tamanho padrao 150mm x 100mm
       const double widthPt = 150 * 2.83465;
       const double heightPt = 100 * 2.83465;
 
       pdf.addPage(
         pw.Page(
           pageFormat: const PdfPageFormat(widthPt, heightPt),
-          margin: pw.EdgeInsets.zero, // ZERA TODAS AS MARGENS DA PÁGINA
+          margin: pw.EdgeInsets.zero,
           build: (pw.Context context) {
             return pw.Row(
               cross: pw.CrossAxisAlignment.stretch,
               children: [
-                // Metade Esquerda: Etiqueta esticada preenchendo 100% da área
                 pw.Expanded(
                   child: pw.Image(
                     etiquetaImage,
-                    fit: pw.BoxFit.fill, // FORÇA PREENCHIMENTO COMPLETO
+                    fit: pw.BoxFit.fill,
                   ),
                 ),
-                // Linha de corte central fina
                 pw.Container(
                   width: 1,
                   color: PdfColors.grey400,
                 ),
-                // Metade Direita: DACE esticada preenchendo 100% da área
                 pw.Expanded(
                   child: pw.Image(
                     daceImage,
-                    fit: pw.BoxFit.fill, // FORÇA PREENCHIMENTO COMPLETO
+                    fit: pw.BoxFit.fill,
                   ),
                 ),
               ],
