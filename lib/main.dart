@@ -36,7 +36,9 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   File? _etiquetaFile;
   File? _daceFile;
+
   final TextEditingController _pedidoController = TextEditingController();
+
   bool _isProcessing = false;
 
   Future<void> _selecionarEtiqueta() async {
@@ -44,6 +46,7 @@ class _HomeScreenState extends State<HomeScreen> {
       type: FileType.custom,
       allowedExtensions: ['pdf', 'png', 'jpg', 'jpeg'],
     );
+
     if (result != null && result.files.single.path != null) {
       setState(() {
         _etiquetaFile = File(result.files.single.path!);
@@ -56,6 +59,7 @@ class _HomeScreenState extends State<HomeScreen> {
       type: FileType.custom,
       allowedExtensions: ['pdf', 'png', 'jpg', 'jpeg'],
     );
+
     if (result != null && result.files.single.path != null) {
       setState(() {
         _daceFile = File(result.files.single.path!);
@@ -66,7 +70,9 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _gerarPdf() async {
     if (_etiquetaFile == null || _daceFile == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Selecione ambos os arquivos!')),
+        const SnackBar(
+          content: Text('Selecione ambos os arquivos!'),
+        ),
       );
       return;
     }
@@ -79,36 +85,47 @@ class _HomeScreenState extends State<HomeScreen> {
       final etiquetaImage = await _carregarImagem(_etiquetaFile!);
       final daceImage = await _carregarImagem(_daceFile!);
 
-      // Tamanho padrão de etiqueta térmica (150mm x 100mm)
       const double widthPt = 150 * 2.83465;
       const double heightPt = 100 * 2.83465;
 
       pdf.addPage(
         pw.Page(
           pageFormat: PdfPageFormat(widthPt, heightPt),
-          margin: pw.EdgeInsets.zero, // Zera margens externas da página
-          build: (pw.Context context) {
+          margin: pw.EdgeInsets.zero,
+          build: (context) {
             return pw.Row(
-              cross: pw.CrossAxisAlignment.stretch,
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
-                pw.Expanded(
-                  child: pw.Container(
-                    margin: pw.EdgeInsets.zero,
-                    child: pw.Image(
-                      etiquetaImage,
-                      fit: pw.BoxFit.fill, // Expande a etiqueta preenchendo toda a metade esquerda
+
+                pw.SizedBox(
+                  width: widthPt / 2,
+                  height: heightPt,
+                  child: pw.Center(
+                    child: pw.Transform.scale(
+                      scale: 1.18,
+                      child: pw.Image(
+                        etiquetaImage,
+                        fit: pw.BoxFit.contain,
+                      ),
                     ),
                   ),
                 ),
-                pw.Expanded(
-                  child: pw.Container(
-                    margin: pw.EdgeInsets.zero,
-                    child: pw.Image(
-                      daceImage,
-                      fit: pw.BoxFit.fill, // Expande o DACE preenchendo toda a metade direita
+
+                pw.SizedBox(
+                  width: widthPt / 2,
+                  height: heightPt,
+                  child: pw.Center(
+                    child: pw.Transform.scale(
+                      scale: 1.10,
+                      child: pw.Image(
+                        daceImage,
+                        fit: pw.BoxFit.contain,
+                      ),
                     ),
                   ),
                 ),
+
               ],
             );
           },
@@ -116,6 +133,7 @@ class _HomeScreenState extends State<HomeScreen> {
       );
 
       final pedido = _pedidoController.text.trim();
+
       final nomeArquivo = pedido.isNotEmpty
           ? 'Etiqueta Mesclada - Pedido $pedido.pdf'
           : 'Etiqueta Mesclada.pdf';
@@ -132,7 +150,9 @@ class _HomeScreenState extends State<HomeScreen> {
       });
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erro ao processar: $e')),
+        SnackBar(
+          content: Text('Erro ao processar: $e'),
+        ),
       );
     } finally {
       setState(() => _isProcessing = false);
@@ -141,16 +161,21 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<pw.ImageProvider> _carregarImagem(File file) async {
     final bytes = await file.readAsBytes();
-    if (file.path.endsWith('.pdf')) {
-      await for (final page in Printing.raster(bytes, pages: [0], dpi: 300)) {
-        final pngBytes = await page.toPng();
-        return pw.MemoryImage(pngBytes);
+
+    if (file.path.toLowerCase().endsWith('.pdf')) {
+      await for (final page in Printing.raster(
+        bytes,
+        pages: [0],
+        dpi: 300,
+      )) {
+        final png = await page.toPng();
+        return pw.MemoryImage(png);
       }
     }
+
     return pw.MemoryImage(bytes);
   }
-
-  @override
+    @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
@@ -162,39 +187,50 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Column(
           children: [
             const SizedBox(height: 10),
+
             ElevatedButton.icon(
               onPressed: _selecionarEtiqueta,
               icon: const Icon(Icons.label),
-              label: Text(_etiquetaFile == null
-                  ? 'Selecionar Etiqueta'
-                  : 'Etiqueta: ${_etiquetaFile!.path.split('/').last}'),
+              label: Text(
+                _etiquetaFile == null
+                    ? 'Selecionar Etiqueta'
+                    : 'Etiqueta: ${_etiquetaFile!.path.split('/').last}',
+              ),
               style: ElevatedButton.styleFrom(
                 minimumSize: const Size.fromHeight(50),
               ),
             ),
+
             const SizedBox(height: 15),
+
             ElevatedButton.icon(
               onPressed: _selecionarDace,
               icon: const Icon(Icons.receipt),
-              label: Text(_daceFile == null
-                  ? 'Selecionar DACE'
-                  : 'DACE: ${_daceFile!.path.split('/').last}'),
+              label: Text(
+                _daceFile == null
+                    ? 'Selecionar DACE'
+                    : 'DACE: ${_daceFile!.path.split('/').last}',
+              ),
               style: ElevatedButton.styleFrom(
                 minimumSize: const Size.fromHeight(50),
               ),
             ),
+
             const SizedBox(height: 15),
+
             TextField(
               controller: _pedidoController,
+              keyboardType: TextInputType.number,
               decoration: const InputDecoration(
                 labelText: 'Número do Pedido',
                 border: OutlineInputBorder(),
                 filled: true,
                 fillColor: Colors.white,
               ),
-              keyboardType: TextInputType.number,
             ),
+
             const SizedBox(height: 30),
+
             _isProcessing
                 ? const CircularProgressIndicator()
                 : ElevatedButton(
@@ -206,9 +242,10 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: const Text(
                       'GERAR E IMPRIMIR PDF',
                       style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white),
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
                     ),
                   ),
           ],
