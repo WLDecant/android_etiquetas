@@ -94,7 +94,7 @@ class _HomeScreenState extends State<HomeScreen> {
       final etiquetaImage = await _carregarImagem(_etiquetaFile!);
       final daceImage = await _carregarImagem(_daceFile!);
 
-      // Dimensão padrão 150mm x 100mm
+      // Tamanho padrão de etiqueta de envio (150mm x 100mm)
       const double widthPt = 150 * 2.83465;
       const double heightPt = 100 * 2.83465;
 
@@ -106,7 +106,7 @@ class _HomeScreenState extends State<HomeScreen> {
             return pw.Row(
               cross: pw.CrossAxisAlignment.stretch,
               children: [
-                // Etiqueta
+                // Etiqueta preenchendo o lado esquerdo
                 pw.Expanded(
                   child: pw.Image(
                     etiquetaImage,
@@ -118,7 +118,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   width: 1,
                   color: PdfColors.grey400,
                 ),
-                // DACE
+                // DACE preenchendo o lado direito
                 pw.Expanded(
                   child: pw.Image(
                     daceImage,
