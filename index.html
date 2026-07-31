@@ -62,7 +62,7 @@
       const fileName = `Etiqueta Mesclada - Pedido ${numPedido}.pdf`;
 
       try {
-        setStatus("Removendo margens A4 e aplicando zoom...");
+        setStatus("Ajustando recorte da etiqueta...");
 
         const bytesEtiqueta = await fileEtiqueta.arrayBuffer();
         const bytesDace = await fileDace.arrayBuffer();
@@ -70,9 +70,24 @@
         const docEtiqueta = await PDFLib.PDFDocument.load(bytesEtiqueta);
         const docDace = await PDFLib.PDFDocument.load(bytesDace);
 
+        const pageEti = docEtiqueta.getPage(0);
         const pageDace = docDace.getPage(0);
-        
-        // 1. ISOLA A DACE (Lado direito)
+
+        // Obter dimensões reais da página de origem
+        const { width: origW, height: origH } = pageEti.getSize();
+
+        // 1. CORTE DA ETIQUETA (x, y, largura, altura)
+        // No PDF-Lib, o ponto (0,0) é o CANTO INFERIOR ESQUERDO.
+        // Como o bloco da etiqueta fica na parte SUPERIOR do A4, definimos o Y a partir de baixo:
+        const cropX = 10;                     // Leve margem na esquerda
+        const cropY = origH * 0.35;           // Descarta os 35% inferiores (sobra em branco)
+        const cropW = origW * 0.95;           // Pega quase a largura inteira da folha
+        const cropH = origH * 0.58;           // Pega o bloco da etiqueta descartando apenas o topo extremo
+
+        pageEti.setCropBox(cropX, cropY, cropW, cropH);
+        pageEti.setMediaBox(cropX, cropY, cropW, cropH);
+
+        // 2. CORTE DA DACE (Lado direito)
         pageDace.setCropBox(0, 0, 283, 326);
         pageDace.setMediaBox(0, 0, 283, 326);
 
@@ -83,17 +98,15 @@
         const [embeddedEtiqueta] = await pdfFinal.embedPdf(docEtiqueta, [0]);
         const [embeddedDace] = await pdfFinal.embedPdf(docDace, [0]);
 
-        // 2. DESENHA A ETIQUETA EXPANDIDA (Tira as margens A4 dando um Zoom de 1.8x)
-        // Em vez de desenhar do ponto (0,0), deslocamos para a esquerda e para baixo
-        // e aumentamos a escala. Isso faz as bordas brancas do A4 "saírem" para fora do papel!
+        // 3. DESENHA A ETIQUETA RECORTADA NA METADE ESQUERDA
         pageFinal.drawPage(embeddedEtiqueta, {
-          x: -40,       // Esconde a margem branca da esquerda
-          y: -120,      // Esconde o rodapé branco do A4
-          width: 380,   // Amplia a etiqueta para o conteúdo preencher a metade
-          height: 520
+          x: 0,
+          y: 0,
+          width: 212.52,
+          height: 283.44
         });
 
-        // 3. DESENHA A DACE NA METADE DIREITA
+        // 4. DESENHA A DACE NA METADE DIREITA
         pageFinal.drawPage(embeddedDace, {
           x: 212.52,
           y: 0,
@@ -111,7 +124,7 @@
         }
         const base64Data = window.btoa(binary);
 
-        // Salvamento / Compartilhamento
+        // Salvamento/Compartilhamento
         if (window.Capacitor && window.Capacitor.Plugins) {
           const { Filesystem, Share } = window.Capacitor.Plugins;
 
