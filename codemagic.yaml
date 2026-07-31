@@ -8,17 +8,22 @@ workflows:
     scripts:
       - name: Configurar Projeto e Sincronizar Capacitor
         script: |
-          # 1. Cria o package.json se não existir
+          # 1. Cria a pasta da aplicação web exigida pelo Capacitor
+          mkdir -p www
+          cp index.html www/
+          cp pdf-lib.min.js www/
+
+          # 2. Inicializa o projeto Node
           npm init -y
 
-          # 2. Instala os pacotes do Capacitor
+          # 3. Instala os pacotes do Capacitor
           npm install @capacitor/core @capacitor/cli @capacitor/android
 
-          # 3. Inicializa e cria a pasta do Android
-          npx cap init "MescladorPDF" "com.empresa.mesclador" --web-dir "."
+          # 4. Inicializa o Capacitor apontando para a pasta 'www'
+          npx cap init "MescladorPDF" "com.empresa.mesclador" --web-dir "www"
           npx cap add android
 
-          # 4. Sincroniza os arquivos e gera os scripts internos (capacitor.settings.gradle)
+          # 5. Sincroniza os arquivos locais com a pasta nativa
           npx cap sync android
           
       - name: Compilar APK (Debug)
