@@ -79,29 +79,33 @@ class _HomeScreenState extends State<HomeScreen> {
       final etiquetaImage = await _carregarImagem(_etiquetaFile!);
       final daceImage = await _carregarImagem(_daceFile!);
 
+      // Tamanho padrão de etiqueta térmica (150mm x 100mm)
       const double widthPt = 150 * 2.83465;
       const double heightPt = 100 * 2.83465;
 
       pdf.addPage(
         pw.Page(
           pageFormat: PdfPageFormat(widthPt, heightPt),
-          margin: pw.EdgeInsets.zero,
+          margin: pw.EdgeInsets.zero, // Zera margens externas da página
           build: (pw.Context context) {
             return pw.Row(
+              cross: pw.CrossAxisAlignment.stretch,
               children: [
                 pw.Expanded(
                   child: pw.Container(
-                    padding: const pw.EdgeInsets.all(4),
-                    child: pw.Center(
-                      child: pw.Image(etiquetaImage, fit: pw.BoxFit.contain),
+                    margin: pw.EdgeInsets.zero,
+                    child: pw.Image(
+                      etiquetaImage,
+                      fit: pw.BoxFit.fill, // Expande a etiqueta preenchendo toda a metade esquerda
                     ),
                   ),
                 ),
                 pw.Expanded(
                   child: pw.Container(
-                    padding: const pw.EdgeInsets.all(4),
-                    child: pw.Center(
-                      child: pw.Image(daceImage, fit: pw.BoxFit.contain),
+                    margin: pw.EdgeInsets.zero,
+                    child: pw.Image(
+                      daceImage,
+                      fit: pw.BoxFit.fill, // Expande o DACE preenchendo toda a metade direita
                     ),
                   ),
                 ),
