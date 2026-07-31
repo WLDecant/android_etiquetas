@@ -8,10 +8,16 @@ workflows:
     scripts:
       - name: Criar arquivos nativos do Android
         script: |
-          flutter create --platforms=android .
+          flutter create --platforms=android --org com.wldecant .
       - name: Obter dependencias do Flutter
         script: |
           flutter packages pub get
+      - name: Ajustar SDK Android para 36
+        script: |
+          cd android
+          sed -i '' 's/compileSdk = .*/compileSdk = 36/g' app/build.gradle.kts 2>/dev/null || true
+          sed -i '' 's/compileSdkVersion .*/compileSdkVersion 36/g' app/build.gradle 2>/dev/null || true
+          cd ..
       - name: Compilar APK
         script: |
           flutter build apk --release --no-tree-shake-icons
