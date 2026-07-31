@@ -5,15 +5,14 @@ workflows:
     instance_type: mac_mini_m1
     environment:
       flutter: stable
-      android_gradle_plugin: 8.2.1
     scripts:
       - name: Criar projeto Android
         script: |
           flutter create --platforms=android --org com.wldecant .
       - name: Configurar SDK 36 no Gradle
         script: |
-          printf "\nandroid.suppressUnsupportedCompileSdk=36\n" >> android/gradle.properties
-          printf "flutter.compileSdkVersion=36\n" >> android/local.properties
+          echo "android.suppressUnsupportedCompileSdk=36" >> android/gradle.properties
+          echo "flutter.compileSdkVersion=36" >> android/local.properties
       - name: Obter dependencias
         script: |
           flutter packages pub get
