@@ -9,7 +9,6 @@ workflows:
       - name: Criar arquivos nativos do Android com SDK 36
         script: |
           flutter create --platforms=android --org com.wldecant .
-          # Injeta configuracao explicita de SDK no build.gradle nativo recem-criado
           python3 -c "
 import os, re
 path = 'android/app/build.gradle'
