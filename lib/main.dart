@@ -1,9 +1,11 @@
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import 'package:image/image.dart' as img;
 
 void main() {
   runApp(const WLDecantApp());
@@ -36,9 +38,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   File? _etiquetaFile;
   File? _daceFile;
-
   final TextEditingController _pedidoController = TextEditingController();
-
   bool _isProcessing = false;
 
   Future<void> _selecionarEtiqueta() async {
@@ -46,7 +46,6 @@ class _HomeScreenState extends State<HomeScreen> {
       type: FileType.custom,
       allowedExtensions: ['pdf', 'png', 'jpg', 'jpeg'],
     );
-
     if (result != null && result.files.single.path != null) {
       setState(() {
         _etiquetaFile = File(result.files.single.path!);
@@ -59,7 +58,6 @@ class _HomeScreenState extends State<HomeScreen> {
       type: FileType.custom,
       allowedExtensions: ['pdf', 'png', 'jpg', 'jpeg'],
     );
-
     if (result != null && result.files.single.path != null) {
       setState(() {
         _daceFile = File(result.files.single.path!);
@@ -67,12 +65,71 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  /// Remove bordas brancas automaticamente da imagem renderizada
+  Uint8List _removerBordasBrancas(Uint8List inputBytes) {
+    final decoded = img.decodeImage(inputBytes);
+    if (decoded == null) return inputBytes;
+
+    int minX = decoded.width;
+    int minY = decoded.height;
+    int maxX = 0;
+    int maxY = 0;
+
+    for (int y = 0; y < decoded.height; y++) {
+      for (int x = 0; x < decoded.width; x++) {
+        final pixel = decoded.getPixel(x, y);
+        final r = pixel.r;
+        final g = pixel.g;
+        final b = pixel.b;
+
+        // Considera qualquer pixel que nao seja essencialmente branco
+        if (r < 240 || g < 240 || b < 240) {
+          if (x < minX) minX = x;
+          if (x > maxX) maxX = x;
+          if (y < minY) minY = y;
+          if (y > maxY) maxY = y;
+        }
+      }
+    }
+
+    if (minX >= maxX || minY >= maxY) return inputBytes;
+
+    // Margem de segurança de 8 pixels
+    minX = (minX - 8).clamp(0, decoded.width - 1);
+    minY = (minY - 8).clamp(0, decoded.height - 1);
+    maxX = (maxX + 8).clamp(0, decoded.width - 1);
+    maxY = (maxY + 8).clamp(0, decoded.height - 1);
+
+    final cropped = img.copyCrop(
+      decoded,
+      x: minX,
+      y: minY,
+      width: maxX - minX,
+      height: maxY - minY,
+    );
+
+    return Uint8List.fromList(img.encodePng(cropped));
+  }
+
+  Future<pw.ImageProvider> _carregarEProcessarImagem(File file) async {
+    final bytes = await file.readAsBytes();
+    Uint8List pngBytes = bytes;
+
+    if (file.path.toLowerCase().endsWith('.pdf')) {
+      await for (final page in Printing.raster(bytes, pages: [0], dpi: 300)) {
+        pngBytes = await page.toPng();
+        break;
+      }
+    }
+
+    final bytesSemBorda = _removerBordasBrancas(pngBytes);
+    return pw.MemoryImage(bytesSemBorda);
+  }
+
   Future<void> _gerarPdf() async {
     if (_etiquetaFile == null || _daceFile == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Selecione ambos os arquivos!'),
-        ),
+        const SnackBar(content: Text('Selecione ambos os arquivos!')),
       );
       return;
     }
@@ -82,9 +139,10 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       final pdf = pw.Document();
 
-      final etiquetaImage = await _carregarImagem(_etiquetaFile!);
-      final daceImage = await _carregarImagem(_daceFile!);
+      final etiquetaImage = await _carregarEProcessarImagem(_etiquetaFile!);
+      final daceImage = await _carregarEProcessarImagem(_daceFile!);
 
+      // Tamanho padrão de etiqueta de envio (150mm x 100mm)
       const double widthPt = 150 * 2.83465;
       const double heightPt = 100 * 2.83465;
 
@@ -92,18 +150,14 @@ class _HomeScreenState extends State<HomeScreen> {
         pw.Page(
           pageFormat: PdfPageFormat(widthPt, heightPt),
           margin: pw.EdgeInsets.zero,
-          build: (context) {
+          build: (pw.Context context) {
             return pw.Row(
-              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
-
-                pw.SizedBox(
-                  width: widthPt / 2,
-                  height: heightPt,
-                  child: pw.Center(
-                    child: pw.Transform.scale(
-                      scale: 1.18,
+                // Esquerda: Etiqueta
+                pw.Expanded(
+                  child: pw.Container(
+                    padding: const pw.EdgeInsets.all(2),
+                    child: pw.Center(
                       child: pw.Image(
                         etiquetaImage,
                         fit: pw.BoxFit.contain,
@@ -111,13 +165,17 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                 ),
-
-                pw.SizedBox(
-                  width: widthPt / 2,
-                  height: heightPt,
-                  child: pw.Center(
-                    child: pw.Transform.scale(
-                      scale: 1.10,
+                // Linha pontilhada de corte
+                pw.Container(
+                  width: 1,
+                  height: double.infinity,
+                  color: PdfColors.grey400,
+                ),
+                // Direita: DACE (Declaração de Conteúdo)
+                pw.Expanded(
+                  child: pw.Container(
+                    padding: const pw.EdgeInsets.all(2),
+                    child: pw.Center(
                       child: pw.Image(
                         daceImage,
                         fit: pw.BoxFit.contain,
@@ -125,7 +183,6 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                 ),
-
               ],
             );
           },
@@ -133,7 +190,6 @@ class _HomeScreenState extends State<HomeScreen> {
       );
 
       final pedido = _pedidoController.text.trim();
-
       final nomeArquivo = pedido.isNotEmpty
           ? 'Etiqueta Mesclada - Pedido $pedido.pdf'
           : 'Etiqueta Mesclada.pdf';
@@ -150,36 +206,18 @@ class _HomeScreenState extends State<HomeScreen> {
       });
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Erro ao processar: $e'),
-        ),
+        SnackBar(content: Text('Erro ao processar: $e')),
       );
     } finally {
       setState(() => _isProcessing = false);
     }
   }
 
-  Future<pw.ImageProvider> _carregarImagem(File file) async {
-    final bytes = await file.readAsBytes();
-
-    if (file.path.toLowerCase().endsWith('.pdf')) {
-      await for (final page in Printing.raster(
-        bytes,
-        pages: [0],
-        dpi: 300,
-      )) {
-        final png = await page.toPng();
-        return pw.MemoryImage(png);
-      }
-    }
-
-    return pw.MemoryImage(bytes);
-  }
-    @override
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('WL Decant - Etiquetas'),
+        title: const Text('WL Decant - Mesclador de Etiquetas'),
         backgroundColor: const Color(0xFF3B82C4),
       ),
       body: Padding(
@@ -187,50 +225,39 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Column(
           children: [
             const SizedBox(height: 10),
-
             ElevatedButton.icon(
               onPressed: _selecionarEtiqueta,
               icon: const Icon(Icons.label),
-              label: Text(
-                _etiquetaFile == null
-                    ? 'Selecionar Etiqueta'
-                    : 'Etiqueta: ${_etiquetaFile!.path.split('/').last}',
-              ),
+              label: Text(_etiquetaFile == null
+                  ? '1. Selecionar Etiqueta'
+                  : 'Etiqueta: ${_etiquetaFile!.path.split('/').last}'),
               style: ElevatedButton.styleFrom(
                 minimumSize: const Size.fromHeight(50),
               ),
             ),
-
             const SizedBox(height: 15),
-
             ElevatedButton.icon(
               onPressed: _selecionarDace,
               icon: const Icon(Icons.receipt),
-              label: Text(
-                _daceFile == null
-                    ? 'Selecionar DACE'
-                    : 'DACE: ${_daceFile!.path.split('/').last}',
-              ),
+              label: Text(_daceFile == null
+                  ? '2. Selecionar DACE (Declaração)'
+                  : 'DACE: ${_daceFile!.path.split('/').last}'),
               style: ElevatedButton.styleFrom(
                 minimumSize: const Size.fromHeight(50),
               ),
             ),
-
             const SizedBox(height: 15),
-
             TextField(
               controller: _pedidoController,
-              keyboardType: TextInputType.number,
               decoration: const InputDecoration(
-                labelText: 'Número do Pedido',
+                labelText: 'Número do Pedido (Opcional)',
                 border: OutlineInputBorder(),
                 filled: true,
                 fillColor: Colors.white,
               ),
+              keyboardType: TextInputType.number,
             ),
-
             const SizedBox(height: 30),
-
             _isProcessing
                 ? const CircularProgressIndicator()
                 : ElevatedButton(
@@ -240,7 +267,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       minimumSize: const Size.fromHeight(55),
                     ),
                     child: const Text(
-                      'GERAR E IMPRIMIR PDF',
+                      'GERAR E GERAR PDF MESCLADO',
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
