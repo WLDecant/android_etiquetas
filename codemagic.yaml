@@ -14,7 +14,7 @@ workflows:
           flutter packages pub get
       - name: Compilar APK
         script: |
-          flutter build apk --release --extra-front-end-options=--no-tree-shake-icons --build-name=1.0.0 --build-number=1
+          flutter build apk --release --no-tree-shake-icons
     artifacts:
       - build/app/outputs/flutter-apk/*.apk
     publishing:
