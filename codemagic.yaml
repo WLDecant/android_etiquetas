@@ -6,18 +6,33 @@ workflows:
     environment:
       flutter: stable
     scripts:
-      - name: Criar arquivos nativos do Android
+      - name: Criar arquivos nativos do Android com SDK 36
         script: |
           flutter create --platforms=android --org com.wldecant .
+          # Injeta configuracao explicita de SDK no build.gradle nativo recem-criado
+          python3 -c "
+import os, re
+path = 'android/app/build.gradle'
+if os.path.exists(path):
+    with open(path, 'r') as f:
+        content = f.read()
+    content = re.sub(r'compileSdkVersion\s+.*', 'compileSdkVersion 36', content)
+    content = re.sub(r'targetSdkVersion\s+.*', 'targetSdkVersion 36', content)
+    with open(path, 'w') as f:
+        f.write(content)
+
+path_kts = 'android/app/build.gradle.kts'
+if os.path.exists(path_kts):
+    with open(path_kts, 'r') as f:
+        content = f.read()
+    content = re.sub(r'compileSdk\s*=.*', 'compileSdk = 36', content)
+    content = re.sub(r'targetSdk\s*=.*', 'targetSdk = 36', content)
+    with open(path_kts, 'w') as f:
+        f.write(content)
+"
       - name: Obter dependencias do Flutter
         script: |
           flutter packages pub get
-      - name: Ajustar SDK Android para 36
-        script: |
-          cd android
-          sed -i '' 's/compileSdk = .*/compileSdk = 36/g' app/build.gradle.kts 2>/dev/null || true
-          sed -i '' 's/compileSdkVersion .*/compileSdkVersion 36/g' app/build.gradle 2>/dev/null || true
-          cd ..
       - name: Compilar APK
         script: |
           flutter build apk --release --no-tree-shake-icons

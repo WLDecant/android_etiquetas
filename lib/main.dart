@@ -76,11 +76,9 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       final pdf = pw.Document();
 
-      // Renderiza ou carrega as páginas para o PDF final 150x100mm
       final etiquetaImage = await _carregarImagem(_etiquetaFile!);
       final daceImage = await _carregarImagem(_daceFile!);
 
-      // Tamanho 150mm x 100mm em pontos PDF (1 mm = 2.83465 pt)
       const double widthPt = 150 * 2.83465;
       const double heightPt = 100 * 2.83465;
 
@@ -118,13 +116,11 @@ class _HomeScreenState extends State<HomeScreen> {
           ? 'Etiqueta Mesclada - Pedido $pedido.pdf'
           : 'Etiqueta Mesclada.pdf';
 
-      // Abre a tela nativa do Android para Imprimir ou Salvar o PDF
       await Printing.sharePdf(
         bytes: await pdf.save(),
         filename: nomeArquivo,
       );
 
-      // Reseta os campos após o sucesso
       setState(() {
         _etiquetaFile = null;
         _daceFile = null;
@@ -142,7 +138,6 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<pw.ImageProvider> _carregarImagem(File file) async {
     final bytes = await file.readAsBytes();
     if (file.path.endsWith('.pdf')) {
-      // Se for PDF, rasteriza a primeira página em alta resolução
       await for (final page in Printing.raster(bytes, pages: [0], dpi: 300)) {
         final pngBytes = await page.toPng();
         return pw.MemoryImage(pngBytes);
@@ -206,7 +201,10 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     child: const Text(
                       'GERAR E IMPRIMIR PDF',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                      style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white),
                     ),
                   ),
           ],
