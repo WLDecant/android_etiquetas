@@ -6,6 +6,9 @@ workflows:
     environment:
       flutter: stable
     scripts:
+      - name: Criar arquivos nativos do Android
+        script: |
+          flutter create --platforms=android .
       - name: Obter dependencias do Flutter
         script: |
           flutter packages pub get
