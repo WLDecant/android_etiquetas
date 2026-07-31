@@ -62,7 +62,7 @@
       const fileName = `Etiqueta Mesclada - Pedido ${numPedido}.pdf`;
 
       try {
-        setStatus("Processando e mesclando os arquivos...");
+        setStatus("Removendo margens A4 e aplicando zoom...");
 
         const bytesEtiqueta = await fileEtiqueta.arrayBuffer();
         const bytesDace = await fileDace.arrayBuffer();
@@ -72,27 +72,28 @@
 
         const pageDace = docDace.getPage(0);
         
-        // Isola o conteúdo da DACE no lado direito
+        // 1. ISOLA A DACE (Lado direito)
         pageDace.setCropBox(0, 0, 283, 326);
         pageDace.setMediaBox(0, 0, 283, 326);
 
-        // Folha final mesclada em formato paisagem (150mm x 100mm = 425.04pt x 283.44pt)
+        // Criar folha final (150mm x 100mm = 425.04pt x 283.44pt)
         const pdfFinal = await PDFLib.PDFDocument.create();
         const pageFinal = pdfFinal.addPage([425.04, 283.44]);
 
         const [embeddedEtiqueta] = await pdfFinal.embedPdf(docEtiqueta, [0]);
         const [embeddedDace] = await pdfFinal.embedPdf(docDace, [0]);
 
-        // 1. DESENHA A ETIQUETA NA POSIÇÃO ORIGINAL (SEM ROTACIONAR)
-        // Ocupa exatamente a metade esquerda da folha términa (212.52 x 283.44 pt)
+        // 2. DESENHA A ETIQUETA EXPANDIDA (Tira as margens A4 dando um Zoom de 1.8x)
+        // Em vez de desenhar do ponto (0,0), deslocamos para a esquerda e para baixo
+        // e aumentamos a escala. Isso faz as bordas brancas do A4 "saírem" para fora do papel!
         pageFinal.drawPage(embeddedEtiqueta, {
-          x: 0,
-          y: 0,
-          width: 212.52,
-          height: 283.44
+          x: -40,       // Esconde a margem branca da esquerda
+          y: -120,      // Esconde o rodapé branco do A4
+          width: 380,   // Amplia a etiqueta para o conteúdo preencher a metade
+          height: 520
         });
 
-        // 2. DESENHA A DACE NA METADE DIREITA
+        // 3. DESENHA A DACE NA METADE DIREITA
         pageFinal.drawPage(embeddedDace, {
           x: 212.52,
           y: 0,
@@ -110,7 +111,7 @@
         }
         const base64Data = window.btoa(binary);
 
-        // Salvamento/Compartilhamento Nativo
+        // Salvamento / Compartilhamento
         if (window.Capacitor && window.Capacitor.Plugins) {
           const { Filesystem, Share } = window.Capacitor.Plugins;
 
