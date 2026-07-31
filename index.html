@@ -55,14 +55,14 @@
       }
 
       if (!fileEtiqueta || !fileDace) {
-        alert("Por favor, selecione os 2 arquivos PDF.");
+        alert("Por favor, selecione ambos os arquivos PDF.");
         return;
       }
 
       const fileName = `Etiqueta Mesclada - Pedido ${numPedido}.pdf`;
 
       try {
-        setStatus("Processando e recortando margens...");
+        setStatus("Cortando bordas brancas e processando...");
 
         const bytesEtiqueta = await fileEtiqueta.arrayBuffer();
         const bytesDace = await fileDace.arrayBuffer();
@@ -70,33 +70,37 @@
         const docEtiqueta = await PDFLib.PDFDocument.load(bytesEtiqueta);
         const docDace = await PDFLib.PDFDocument.load(bytesDace);
 
-        // Define folha mesclada (150mm x 100mm = 425.04pt x 283.44pt)
+        // CORTE REVOLUCIONÁRIO: Redefine a visibilidade da página original cortando o A4
+        // x: 0, y: 420 (corta os 420pt em branco do topo/base), largura: 283pt, altura: 422pt
+        const page1 = docEtiqueta.getPage(0);
+        page1.setCropBox(0, 420, 283, 422);
+        page1.setMediaBox(0, 420, 283, 422);
+
+        const page2 = docDace.getPage(0);
+        page2.setCropBox(0, 0, 283, 326);
+        page2.setMediaBox(0, 0, 283, 326);
+
+        // Cria o PDF final (150mm x 100mm = 425.04pt x 283.44pt)
         const pdfFinal = await PDFLib.PDFDocument.create();
         const pageFinal = pdfFinal.addPage([425.04, 283.44]);
 
         const [embeddedEtiqueta] = await pdfFinal.embedPdf(docEtiqueta, [0]);
         const [embeddedDace] = await pdfFinal.embedPdf(docDace, [0]);
 
-        // Recorta a etiqueta (remove bordas A4) e desenha na esquerda
+        // Lado Esquerdo: Etiqueta (Preenche 100% da metade sem margem)
         pageFinal.drawPage(embeddedEtiqueta, {
           x: 0,
           y: 0,
           width: 212.52,
-          height: 283.44,
-          xScale: 1,
-          yScale: 1,
-          boundingClientRect: { x: 15, y: 415, width: 265, height: 410 }
+          height: 283.44
         });
 
-        // Recorta a DACE e desenha na direita
+        // Lado Direito: DACE
         pageFinal.drawPage(embeddedDace, {
           x: 212.52,
           y: 0,
           width: 212.52,
-          height: 283.44,
-          xScale: 1,
-          yScale: 1,
-          boundingClientRect: { x: 0, y: 0, width: 283.46, height: 325.99 }
+          height: 283.44
         });
 
         const pdfBytes = await pdfFinal.save();
@@ -109,39 +113,37 @@
         }
         const base64Data = window.btoa(binary);
 
-        // Gravando via Capacitor Filesystem
-        if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Filesystem) {
-          const { Filesystem, FileOpener } = window.Capacitor.Plugins;
+        // SALVAMENTO COM MENU DE ESCOLHA DO ANDROID
+        if (window.Capacitor && window.Capacitor.Plugins) {
+          const { Filesystem, Share } = window.Capacitor.Plugins;
 
-          // Salva na pasta pública 'Documents' do armazenamento interno
-          const saveResult = await Filesystem.writeFile({
+          // 1. Grava o arquivo temporariamente no cache para poder compartilhar/salvar
+          const fileResult = await Filesystem.writeFile({
             path: fileName,
             data: base64Data,
-            directory: 'DOCUMENTS',
-            recursive: true
+            directory: 'CACHE'
           });
 
-          setStatus(`✅ Salvo na pasta Documentos!\nArquivo: ${fileName}`, 'green');
+          setStatus("Abrindo seletor de pasta do Android...", "blue");
 
-          // Tenta abrir o PDF automaticamente no leitor padrão do Android
-          if (FileOpener) {
-            try {
-              await FileOpener.open({
-                filePath: saveResult.uri,
-                contentType: 'application/pdf'
-              });
-            } catch (e) {
-              console.log("Não foi possível abrir o leitor nativo automaticamente.", e);
-            }
+          // 2. Aciona o Seletor/Menu Nativo do Android (Escolher Pasta, Drive, Salvar em..., etc)
+          if (Share) {
+            await Share.share({
+              title: fileName,
+              text: `Etiqueta Mesclada do Pedido ${numPedido}`,
+              url: fileResult.uri,
+              dialogTitle: 'Escolha onde salvar o PDF'
+            });
+            setStatus(`✅ Processo concluído para o pedido ${numPedido}!`, 'green');
           }
         } else {
-          // Fallback para navegador
+          // Navegador Web
           const blob = new Blob([pdfBytes], { type: 'application/pdf' });
           const link = document.createElement('a');
           link.href = URL.createObjectURL(blob);
           link.download = fileName;
           link.click();
-          setStatus(`✅ Gerado e baixado: ${fileName}`, 'green');
+          setStatus(`✅ Baixado: ${fileName}`, 'green');
         }
       } catch (err) {
         console.error(err);
