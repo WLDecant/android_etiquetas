@@ -1,34 +1,27 @@
 workflows:
-  android-build:
-    name: Compilar APK Android
+  android-apk-build:
+    name: Build Android APK (Offline WebApp)
     max_build_duration: 30
     instance_type: mac_mini_m1
-
     environment:
-      flutter: stable
-
+      node: 18.x.x
+      java: 17
     scripts:
-      - name: Criar projeto Android
+      - name: Instalar dependências e CLI do Capacitor
         script: |
-          flutter create --platforms=android --org com.wldecant .
-
-      - name: Atualizar compileSdk
+          npm init -y
+          npm install @capacitor/core @capacitor/cli @capacitor/android
+          
+      - name: Inicializar Capacitor e Plataforma Android
         script: |
-          sed -i '' 's/compileSdk = flutter.compileSdkVersion/compileSdk = 36/' android/app/build.gradle.kts || true
-          sed -i '' 's/targetSdk = flutter.targetSdkVersion/targetSdk = 36/' android/app/build.gradle.kts || true
-          sed -i '' 's/compileSdkVersion flutter.compileSdkVersion/compileSdkVersion 36/' android/app/build.gradle || true
-          sed -i '' 's/targetSdkVersion flutter.targetSdkVersion/targetSdkVersion 36/' android/app/build.gradle || true
-
-      - name: Pub Get
-        script: flutter pub get
-
-      - name: Build
-        script: flutter build apk --release
+          npx cap init "MescladorPDF" "com.empresa.mesclador" --web-dir "."
+          npx cap add android
+          npx cap copy android
+          
+      - name: Compilar APK (Debug)
+        script: |
+          cd android
+          ./gradlew assembleDebug
 
     artifacts:
-      - build/app/outputs/flutter-apk/*.apk
-
-    publishing:
-      email:
-        recipients:
-          - wldecant@gmail.com
+      - android/app/build/outputs/apk/**/*.apk
