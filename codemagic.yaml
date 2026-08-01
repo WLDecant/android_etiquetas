@@ -5,22 +5,44 @@ workflows:
     instance_type: mac_mini_m1
     environment:
       java: 17
+      node: 18.x
     scripts:
       - name: Preparar Estrutura do App (Offline)
         script: |
           mkdir -p www
           cp index.html www/
           cp pdf-lib.min.js www/
+          # Certifique-se de colocar a sua imagem de ícone (ex: icone.png) na raiz do repositório se quiser usá-la
+          # cp icone.png www/ (ou na raiz)
 
       - name: Instalar Dependências e Plugins Nativos
         script: |
           npm init -y
           npm install @capacitor/core@^6.0.0 @capacitor/cli@^6.0.0 @capacitor/android@^6.0.0 @capacitor/filesystem@^6.0.0 @capacitor/share@^6.0.0
+          # Instala ferramenta de assets para gerar os ícones nativos automaticamente
+          npm install -g @capacitor/assets
 
-      - name: Sincronizar Plataforma Android
+      - name: Sincronizar Plataforma Android e Nome do App
         script: |
-          npx cap init "MescladorPDF" "com.empresa.mesclador" --web-dir "www"
+          # Inicializa com o nome amigável desejado
+          npx cap init "WL Decant" "com.wldecant.mesclador" --web-dir "www"
+          
+          # Garante que o capacitor.config.json está com o nome correto
+          node -e '
+            const fs = require("fs");
+            const config = JSON.parse(fs.readFileSync("capacitor.config.json", "utf8"));
+            config.appName = "WL Decant";
+            fs.writeFileSync("capacitor.config.json", JSON.stringify(config, null, 2));
+          '
+
           npx cap add android
+          
+          # Se você tiver uma imagem chamada "icone.png" na raiz do projeto (ex: 512x512px), 
+          # o comando abaixo gera todos os ícones nativos para o Android automaticamente:
+          if [ -f "icone.png" ]; then
+            npx capacitor-assets generate --iconBackgroundColor #ffffff --iconBackgroundColorDark #000000
+          fi
+
           npx cap sync android
 
       - name: Compilar APK (Debug)
