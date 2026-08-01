@@ -5,14 +5,19 @@ workflows:
     instance_type: mac_mini_m1
     environment:
       java: 17
-      node: 18.19.0 # Declarar a versão exata no environment evita o uso do comando 'n'
+      node: 18.19.0
     scripts:
       - name: Preparar Estrutura do App (Offline)
         script: |
           mkdir -p www
           cp index.html www/
           cp pdf-lib.min.js www/
-          # Se usar ícone: cp "Logo sem fundo.png" www/icone.png
+          
+          # Copia o icone.png da raiz para a pasta de assets que o capacitor-assets procura
+          if [ -f "icone.png" ]; then
+            mkdir -p assets
+            cp icone.png assets/logo.png
+          fi
 
       - name: Instalar Dependências e Plugins Nativos
         script: |
@@ -33,8 +38,9 @@ workflows:
 
           npx cap add android
           
-          if [ -f "www/icone.png" ]; then
-            npx capacitor-assets generate --iconBackgroundColor #ffffff --iconBackgroundColorDark #000000
+          # Gera os ícones usando a imagem da pasta assets se ela existir
+          if [ -f "assets/logo.png" ]; then
+            npx capacitor-assets generate --assetPath assets --iconBackgroundColor #ffffff
           fi
 
           npx cap sync android
