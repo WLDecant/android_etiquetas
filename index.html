@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Mesclador PDF Offline</title>
+  <title>Mesclador de etiquetas - WL Decant</title>
   <style>
     * { box-sizing: border-box; }
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 20px; background: #f5f5f5; margin: 0; }
@@ -21,7 +21,7 @@
 <body>
 
   <div class="card">
-    <h2>Mesclador de Etiquetas</h2>
+    <h2>Mesclador de Etiquetas - WL Decant</h2>
 
     <label for="numPedido">Número do Pedido</label>
     <input type="text" id="numPedido" placeholder="Ex: 100" />
@@ -62,62 +62,54 @@
       const fileName = `Etiqueta Mesclada - Pedido ${numPedido}.pdf`;
 
       try {
-        setStatus("Processando e mesclando os arquivos...");
+        setStatus("Processando documentos...");
 
         const bytesEtiqueta = await fileEtiqueta.arrayBuffer();
         const bytesDace = await fileDace.arrayBuffer();
 
-        // Carrega os documentos
-        const docEtiqueta = await PDFLib.PDFDocument.load(bytesEtiqueta, { ignoreEncryption: true });
+        const docEtiquetaOriginal = await PDFLib.PDFDocument.load(bytesEtiqueta, { ignoreEncryption: true });
         const docDace = await PDFLib.PDFDocument.load(bytesDace, { ignoreEncryption: true });
 
-        // Validação de segurança para evitar o erro 'reading node'
-        if (docEtiqueta.getPageCount() === 0 || docDace.getPageCount() === 0) {
-          throw new Error("Um dos PDFs selecionados está vazio ou corrompido.");
-        }
+        // --- PREPARAÇÃO DO CORTE DA ETIQUETA (150x100mm) ---
+        // Dimensões exatas em pontos (1mm = 2.83465pt)
+        const etiquetaW = 425.2;  // 150mm
+        const etiquetaH = 283.46; // 100mm
 
-        const pageEti = docEtiqueta.getPage(0);
-        const pageDace = docDace.getPage(0);
+        const pageEtiqueta = docEtiquetaOriginal.getPage(0);
 
-        const a4W = pageEti.getWidth();
-        const a4H = pageEti.getHeight();
-        const daceW = pageDace.getWidth();
-        const daceH = pageDace.getHeight();
+const pageW = pageEtiqueta.getWidth();
+const pageH = pageEtiqueta.getHeight();
 
-        // Criar documento final em paisagem (150mm x 100mm = 425.04pt x 283.44pt)
+
+
+        // --- MONTAGEM DO PDF FINAL ---
+        // PDF final em paisagem (150mm x 100mm)
         const pdfFinal = await PDFLib.PDFDocument.create();
-        const pageFinal = pdfFinal.addPage([425.04, 283.44]);
+        const pageFinal = pdfFinal.addPage([425.2, 283.46]);
 
-        // 1. EMBED DA ETIQUETA (Cortando a metade inferior para manter só o topo A4)
-        const [embeddedEtiqueta] = await pdfFinal.embedPdf(docEtiqueta, [{
-          left: 0,
-          bottom: a4H * 0.45,
-          right: a4W,
-          top: a4H
-        }]);
+        // Embarca as páginas usando índices simples (evita o erro 'reading node')
+       const embeddedEtiqueta = await pdfFinal.embedPage(pageEtiqueta, {
+    left: 0,
+    right: pageW / 2,
+    bottom: pageH / 2,
+    top: pageH
+});
+        const [embeddedDace] = await pdfFinal.embedPdf(docDace, [0]);
 
-        // 2. EMBED DA DACE INTEIRA
-        const [embeddedDace] = await pdfFinal.embedPdf(docDace, [{
-          left: 0,
-          bottom: 0,
-          right: daceW,
-          top: daceH
-        }]);
-
-        // 3. DESENHA A DACE NO LADO ESQUERDO (X = 0)
-        pageFinal.drawPage(embeddedDace, {
+        // 1. ETIQUETA CORTADA NA ESQUERDA (212.6pt x 283.46pt)
+        pageFinal.drawPage(embeddedEtiqueta, {
           x: 0,
           y: 0,
-          width: 212.52,
-          height: 283.44
+          width: 212.6,
+          height: 283.46
         });
 
-        // 4. DESENHA A ETIQUETA NO LADO DIREITO (X = 212.52)
-        pageFinal.drawPage(embeddedEtiqueta, {
-          x: 212.52,
+        // 2. DACE NA DIREITA (212.6pt x 283.46pt)
+        pageFinal.drawPage(embeddedDace, {
+          x: 212.6,
           y: 0,
-          width: 212.52,
-          height: 283.44
+          width: 212.6,
+          height: 283.46
         });
 
         const pdfBytes = await pdfFinal.save();
